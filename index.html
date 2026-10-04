@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0f1a">
+  <title>RELIEF.AI | Tamil Nadu Flood Relief & Precipitation Portal</title>
+  <meta name="description" content="Tamil Nadu flood relief management with real-time precipitation intelligence across 38 districts, GloFAS river telemetry, and deep learning triage.">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen" class="login-screen">
+  <div class="login-bg"></div>
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="login-logo"><i data-lucide="shield-alert"></i></div>
+      <div>
+        <h1>RELIEF.AI</h1>
+        <p>Smart Disaster Relief Portal</p>
+      </div>
+    </div>
+    <div class="login-divider"></div>
+    <h2>Secure Access</h2>
+    <p class="login-sub">Authorised emergency personnel only</p>
+    <div class="login-error hidden" id="login-error">
+      <i data-lucide="alert-circle"></i>
+      <span id="login-error-msg">Invalid credentials.</span>
+    </div>
+    <form id="login-form" class="login-form">
+      <div class="form-group">
+        <label for="login-email">Email</label>
+        <div class="login-input-wrap">
+          <i data-lucide="mail" class="login-icon"></i>
+          <input type="email" id="login-email" class="form-input login-input" placeholder="ops@relief.ai" required autocomplete="email">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="login-password">Password</label>
+        <div class="login-input-wrap">
+          <i data-lucide="lock" class="login-icon"></i>
+          <input type="password" id="login-password" class="form-input login-input" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+      </div>
+      <button type="submit" class="btn btn-danger login-submit" id="login-submit">
+        <span id="login-btn-label">Access Portal</span>
+        <i data-lucide="log-in" id="login-btn-icon"></i>
+      </button>
+    </form>
+    <p class="login-footer">🔒 256-bit encrypted · NDMA compliant · Audit logged</p>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div class="app-container" id="app-container" style="display:none;">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-logo"><i data-lucide="shield-alert"></i></div>
+      <div class="brand-text">
+        <h1>RELIEF.AI</h1>
+        <span class="brand-tag">Disaster Command</span>
+      </div>
+    </div>
+
+    <div class="alert-ticker" id="alert-ticker">
+      <span class="ticker-dot"></span>
+      <span id="ticker-text">System initialising…</span>
+    </div>
+
+    <nav class="nav-menu">
+      <a href="#" class="nav-item active" data-tab="command">
+        <i data-lucide="activity"></i><span>Command Center</span>
+        <span class="nav-badge danger" id="nb-command" style="display:none">0</span>
+      </a>
+      <a href="#" class="nav-item" data-tab="map">
+        <i data-lucide="map"></i><span>Disaster Map</span>
+        <span class="nav-badge pulse" id="nb-map">Live</span>
+      </a>
+      <a href="#" class="nav-item" data-tab="triage">
+        <i data-lucide="brain-circuit"></i><span>AI Triage</span>
+        <span class="nav-badge warning" id="nb-triage" style="display:none">0</span>
+      </a>
+      <a href="#" class="nav-item" data-tab="resources">
+        <i data-lucide="package"></i><span>Resource Hub</span>
+        <span class="nav-badge" id="nb-resources" style="display:none">0</span>
+      </a>
+      <a href="#" class="nav-item" data-tab="victims">
+        <i data-lucide="users"></i><span>Victim Registry</span>
+        <span class="nav-badge" id="nb-victims" style="display:none">0</span>
+      </a>
+      <a href="#" class="nav-item" data-tab="volunteers">
+        <i data-lucide="hard-hat"></i><span>Volunteer Dispatch</span>
+        <span class="nav-badge success" id="nb-volunteers" style="display:none">0</span>
+      </a>
+      <a href="#" class="nav-item" data-tab="analytics">
+        <i data-lucide="bar-chart-3"></i><span>Deep Analytics</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="system-status">
+        <div class="status-dot online" id="sys-dot"></div>
+        <span id="sys-label">All Systems Nominal</span>
+      </div>
+      <div class="user-pill" id="user-pill" style="display:none;">
+        <i data-lucide="user-circle-2"></i>
+        <span id="user-email">ops@relief.ai</span>
+      </div>
+      <p class="footer-ver">v2.0.0 · RELIEF.AI © 2026</p>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+    <!-- HEADER -->
+    <header class="app-header">
+      <div class="header-left">
+        <button class="btn btn-ghost sidebar-toggle-btn" id="sidebar-toggle" aria-label="Toggle sidebar">
+          <i data-lucide="menu"></i>
+        </button>
+        <div>
+          <h2 id="page-title">Command Center</h2>
+          <p class="header-sub" id="page-sub">Live operational overview — all active disaster zones</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="btn btn-ghost" id="btn-cmd" title="Command Palette (Ctrl+K)" aria-label="Command palette">
+          <i data-lucide="search"></i><span class="kbd-hint">Ctrl+K</span>
+        </button>
+        <div class="alert-badge-btn" id="btn-alerts">
+          <button class="btn btn-ghost" aria-label="Alerts">
+            <i data-lucide="bell"></i>
+            <span class="alert-count hidden" id="alert-count">0</span>
+          </button>
+        </div>
+        <div class="clock-widget">
+          <i data-lucide="clock"></i><span id="current-time">00:00:00</span>
+        </div>
+        <button class="btn btn-danger" id="btn-declare-emergency">
+          <i data-lucide="siren"></i><span>Declare Emergency</span>
+        </button>
+        <button class="btn btn-ghost" id="btn-sign-out" style="display:none" title="Sign out">
+          <i data-lucide="log-out"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- ALERT DROPDOWN -->
+    <div class="alert-dropdown glass hidden" id="alert-dropdown">
+      <div class="alert-drop-header">
+        <span>Live Alerts</span>
+        <button class="mark-read-btn" id="btn-mark-alerts-read">Clear all</button>
+      </div>
+      <div id="alert-list" class="alert-list"></div>
+    </div>
+
+    <!-- PANEL VIEWPORT -->
+    <div class="panel-viewport">
+
+      <!-- ===== PANEL: COMMAND CENTER ===== -->
+      <section id="panel-command" class="tab-panel active">
+        <div class="kpi-grid">
+          <div class="kpi-card glass danger-card" id="kpi-active-disasters">
+            <div class="kpi-icon danger"><i data-lucide="flame"></i></div>
+            <div class="kpi-info">
+              <span>Active Disasters</span>
+              <strong id="kpi-disasters-val">0</strong>
+              <small id="kpi-disasters-sub">0 critical</small>
+            </div>
+            <canvas class="kpi-spark" id="spark-disasters" width="60" height="28"></canvas>
+          </div>
+          <div class="kpi-card glass warning-card">
+            <div class="kpi-icon warning"><i data-lucide="users"></i></div>
+            <div class="kpi-info">
+              <span>People Affected</span>
+              <strong id="kpi-affected-val">0</strong>
+              <small id="kpi-affected-sub">0 critical, 0 stable</small>
+            </div>
+            <canvas class="kpi-spark" id="spark-affected" width="60" height="28"></canvas>
+          </div>
+          <div class="kpi-card glass success-card">
+            <div class="kpi-icon success"><i data-lucide="hard-hat"></i></div>
+            <div class="kpi-info">
+              <span>Responders Deployed</span>
+              <strong id="kpi-responders-val">0</strong>
+              <small id="kpi-responders-sub">0 on-site</small>
+            </div>
+            <canvas class="kpi-spark" id="spark-responders" width="60" height="28"></canvas>
+          </div>
+          <div class="kpi-card glass info-card">
+            <div class="kpi-icon info"><i data-lucide="package"></i></div>
+            <div class="kpi-info">
+              <span>Resources Deployed</span>
+              <strong id="kpi-resources-val">0</strong>
+              <small id="kpi-resources-sub">0 pending requests</small>
+            </div>
+            <canvas class="kpi-spark" id="spark-resources" width="60" height="28"></canvas>
+          </div>
+          <div class="kpi-card glass ai-card">
+            <div class="kpi-icon ai"><i data-lucide="brain-circuit"></i></div>
+            <div class="kpi-info">
+              <span>AI Triage Score</span>
+              <strong id="kpi-ai-score">0%</strong>
+              <small id="kpi-ai-sub">Model accuracy</small>
+            </div>
+            <canvas class="kpi-spark" id="spark-ai" width="60" height="28"></canvas>
+          </div>
+          <div class="kpi-card glass">
+            <div class="kpi-icon"><i data-lucide="clock"></i></div>
+            <div class="kpi-info">
+              <span>Avg Response Time</span>
+              <strong id="kpi-response-val">0 min</strong>
+              <small id="kpi-response-sub">Target: &lt;12 min</small>
+            </div>
+            <canvas class="kpi-spark" id="spark-response" width="60" height="28"></canvas>
+          </div>
+        </div>
+
+        <div class="cmd-grid">
+          <!-- Active Disaster Feed -->
+          <div class="card glass cmd-card-wide">
+            <div class="card-header">
+              <div class="header-group">
+                <h4>Active Flood Emergency Declarations</h4>
+                <p class="card-sub" id="page-sub-feed">Loading live Tamil Nadu river telemetry & precipitation intelligence across 38 districts…</p>
+              </div>
+              <div class="card-actions">
+                <span class="pill pill-danger pulse-pill" id="disaster-count-pill">0 Flood Events</span>
+                <button class="btn btn-sm btn-ghost" id="btn-refresh-data" title="Refresh live data">
+                  <i data-lucide="refresh-cw"></i> Refresh
+                </button>
+                <button class="btn btn-sm btn-danger" id="btn-add-disaster">
+                  <i data-lucide="plus"></i> Declare Flood
+                </button>
+              </div>
+            </div>
+            <div class="card-body" style="padding:0;">
+              <div id="disaster-feed" class="disaster-feed"></div>
+            </div>
+          </div>
+
+          <!-- LLM Situation Report -->
+          <div class="card glass">
+            <div class="card-header">
+              <div class="header-group">
+                <h4>🤖 AI Situation Report</h4>
+                <p class="card-sub">LLM-generated operational briefing</p>
+              </div>
+              <button class="btn btn-sm btn-primary" id="btn-gen-report">
+                <i data-lucide="sparkles"></i> Generate
+              </button>
+            </div>
+            <div class="card-body">
+              <div class="ai-report-box" id="ai-report-box">
+                <div class="ai-report-placeholder">
+                  <i data-lucide="brain-circuit"></i>
+                  <p>Click <strong>Generate</strong> to get an AI situation analysis based on current field data.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Actions -->
+          <div class="card glass">
+            <div class="card-header">
+              <h4>Operations Log</h4>
+              <button class="btn btn-sm btn-ghost" id="btn-clear-ops-log">Clear</button>
+            </div>
+            <div class="card-body" style="padding:0;">
+              <div id="ops-log" class="ops-log"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PANEL: DISASTER MAP ===== -->
+      <section id="panel-map" class="tab-panel">
+        <div class="map-layout">
+          <div class="map-wrap glass">
+            <div id="disaster-map"></div>
+            <div class="map-overlay-panel glass">
+              <div class="map-overlay-row">
+                <span>Tamil Nadu Precipitation Map</span>
+                <span class="pill pill-info pulse-pill">Weather API Live</span>
+              </div>
+              <div class="map-stats-grid">
+                <div class="map-stat"><span>Districts</span><strong id="map-zones">38</strong></div>
+                <div class="map-stat"><span>&gt; 50mm High Rain</span><strong id="map-high-rain-count" style="color:var(--danger)">0</strong></div>
+                <div class="map-stat"><span>Max Forecast</span><strong id="map-max-forecast" style="color:var(--warning)">-- mm</strong></div>
+                <div class="map-stat"><span>Active Rain</span><strong id="map-active-districts" style="color:var(--info)">0</strong></div>
+                <div class="map-stat map-stat-full"><span>Peak Current Rate</span><strong id="map-precip" style="color:var(--info)">0.0 mm/h</strong></div>
+              </div>
+            </div>
+            <div class="map-legend glass">
+              <div class="legend-item"><span class="leg-dot critical"></span> &gt; 50 mm (High Prediction)</div>
+              <div class="legend-item"><span class="leg-dot warning"></span> 20 – 50 mm (Moderate Rain)</div>
+              <div class="legend-item"><span class="leg-dot precip"></span> &lt; 20 mm (Light / Dry)</div>
+            </div>
+          </div>
+          <div class="map-sidebar glass">
+            <div class="map-sidebar-header">
+              <div class="header-group">
+                <h4>Rainfall Forecast</h4>
+                <p class="card-sub" id="high-rain-sub">&gt; 50mm High Prediction</p>
+              </div>
+              <select id="zone-filter" class="form-select" style="width:auto">
+                <option value="high-rain" selected>&gt; 50mm Prediction</option>
+                <option value="active-rain">Active Rainfall</option>
+                <option value="all">All 38 Districts</option>
+              </select>
+            </div>
+            <div id="zone-list" class="zone-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PANEL: AI TRIAGE ===== -->
+      <section id="panel-triage" class="tab-panel">
+        <div class="triage-layout">
+          <!-- Triage Input -->
+          <div class="card glass triage-input-card">
+            <div class="card-header">
+              <div class="header-group">
+                <h4><i data-lucide="brain-circuit" style="width:18px;height:18px;vertical-align:-3px;margin-right:6px;color:var(--ai)"></i>AI Deep Learning Triage Engine</h4>
+                <p class="card-sub">Multi-modal neural network: vitals + context → priority classification</p>
+              </div>
+              <span class="pill pill-ai">CNN + LSTM Model · 97.4% Accuracy</span>
+            </div>
+            <div class="card-body">
+              <div class="triage-form-grid">
+                <div class="form-group">
+                  <label>Victim Name / ID</label>
+                  <input type="text" id="tri-name" class="form-input" placeholder="e.g. Ramesh Kumar / VIC-0042">
+                </div>
+                <div class="form-group">
+                  <label>Age</label>
+                  <input type="number" id="tri-age" class="form-input" placeholder="e.g. 45" min="0" max="120">
+                </div>
+                <div class="form-group">
+                  <label>Heart Rate (bpm)</label>
+                  <input type="number" id="tri-hr" class="form-input" placeholder="e.g. 95" min="0" max="300">
+                </div>
+                <div class="form-group">
+                  <label>Blood Pressure (mmHg)</label>
+                  <input type="text" id="tri-bp" class="form-input" placeholder="e.g. 140/90">
+                </div>
+                <div class="form-group">
+                  <label>SpO2 (%)</label>
+                  <input type="number" id="tri-spo2" class="form-input" placeholder="e.g. 94" min="0" max="100">
+                </div>
+                <div class="form-group">
+                  <label>Respiration Rate</label>
+                  <input type="number" id="tri-rr" class="form-input" placeholder="e.g. 18" min="0" max="80">
+                </div>
+                <div class="form-group">
+                  <label>GCS Score (1–15)</label>
+                  <input type="number" id="tri-gcs" class="form-input" placeholder="e.g. 13" min="1" max="15">
+                </div>
+                <div class="form-group">
+                  <label>Injury Type</label>
+                  <select id="tri-injury" class="form-select">
+                    <option value="">— Select —</option>
+                    <option>Trauma / Crush</option>
+                    <option>Burns</option>
+                    <option>Drowning / Asphyxia</option>
+                    <option>Fracture</option>
+                    <option>Internal Bleeding</option>
+                    <option>Head Injury</option>
+                    <option>Chemical Exposure</option>
+                    <option>Dehydration / Shock</option>
+                    <option>Minor Lacerations</option>
+                    <option>Unknown</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Disaster Type</label>
+                  <select id="tri-disaster" class="form-select">
+                    <option value="Flood" selected>Flood</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Additional Symptoms / Notes</label>
+                  <textarea id="tri-notes" class="form-input" rows="2" placeholder="Describe symptoms, environment, access difficulty…"></textarea>
+                </div>
+              </div>
+              <div class="triage-actions">
+                <button class="btn btn-ai" id="btn-run-triage">
+                  <i data-lucide="zap"></i> Run AI Triage
+                </button>
+                <button class="btn btn-ghost" id="btn-clear-triage">Clear</button>
+              </div>
+              <!-- AI Result -->
+              <div id="triage-result" class="triage-result hidden"></div>
+            </div>
+          </div>
+
+          <!-- Triage Queue -->
+          <div class="card glass triage-queue-card">
+            <div class="card-header">
+              <h4>Triage Queue</h4>
+              <div class="card-actions">
+                <span class="pill pill-danger" id="triage-critical-count">0 Critical</span>
+                <span class="pill pill-warning" id="triage-urgent-count">0 Urgent</span>
+                <button class="btn btn-sm btn-ghost" id="btn-export-triage">
+                  <i data-lucide="download"></i> Export
+                </button>
+              </div>
+            </div>
+            <div class="card-body" style="padding:0;">
+              <div id="triage-queue" class="triage-queue"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PANEL: RESOURCE HUB ===== -->
+      <section id="panel-resources" class="tab-panel">
+        <div class="resources-layout">
+          <div class="resource-summary-strip">
+            <div class="res-stat-card glass">
+              <i data-lucide="droplets" style="color:var(--info)"></i>
+              <div><span>Water Packets</span><strong id="res-water">0</strong></div>
+            </div>
+            <div class="res-stat-card glass">
+              <i data-lucide="wheat" style="color:var(--success)"></i>
+              <div><span>Food Rations</span><strong id="res-food">0</strong></div>
+            </div>
+            <div class="res-stat-card glass">
+              <i data-lucide="heart-pulse" style="color:var(--danger)"></i>
+              <div><span>Medical Kits</span><strong id="res-medical">0</strong></div>
+            </div>
+            <div class="res-stat-card glass">
+              <i data-lucide="tent" style="color:var(--warning)"></i>
+              <div><span>Shelter Kits</span><strong id="res-shelter">0</strong></div>
+            </div>
+            <div class="res-stat-card glass">
+              <i data-lucide="zap" style="color:var(--ai)"></i>
+              <div><span>Power Units</span><strong id="res-power">0</strong></div>
+            </div>
+            <div class="res-stat-card glass">
+              <i data-lucide="truck" style="color:var(--text-secondary)"></i>
+              <div><span>Vehicles</span><strong id="res-vehicles">0</strong></div>
+            </div>
+          </div>
+
+          <div class="res-main-grid">
+            <div class="card glass">
+              <div class="card-header">
+                <div class="header-group">
+                  <h4>Resource Inventory</h4>
+                  <p class="card-sub">Real-time stock across all depots</p>
+                </div>
+                <div class="card-actions">
+                  <button class="btn btn-sm btn-primary" id="btn-add-resource">
+                    <i data-lucide="plus"></i> Add
+                  </button>
+                  <button class="btn btn-sm btn-ghost" id="btn-export-resources">
+                    <i data-lucide="download"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="card-body table-responsive">
+                <table class="data-table" id="resource-table">
+                  <thead>
+                    <tr>
+                      <th>Resource</th><th>Category</th><th>Available</th>
+                      <th>Deployed</th><th>Depot</th><th>Status</th><th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="resource-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card glass">
+              <div class="card-header">
+                <h4>AI Resource Allocation</h4>
+                <p class="card-sub">Deep learning optimal deployment recommendation</p>
+              </div>
+              <div class="card-body">
+                <div id="ai-allocation-box" class="ai-allocation-box">
+                  <div class="ai-placeholder">
+                    <i data-lucide="cpu"></i>
+                    <p>AI will analyse current needs vs stock and recommend optimal allocation.</p>
+                  </div>
+                </div>
+                <button class="btn btn-ai" id="btn-ai-allocate" style="margin-top:14px;width:100%;justify-content:center;">
+                  <i data-lucide="sparkles"></i> Run AI Allocation
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PANEL: VICTIM REGISTRY ===== -->
+      <section id="panel-victims" class="tab-panel">
+        <div class="victims-layout">
+          <div class="card glass">
+            <div class="card-header">
+              <div class="header-group">
+                <h4>Victim Registry</h4>
+                <p class="card-sub">Centralised identification and status tracking</p>
+              </div>
+              <div class="card-actions">
+                <input type="text" id="victim-search" class="form-input search-input" placeholder="Search by name, ID, location…">
+                <select id="victim-status-filter" class="form-select">
+                  <option value="all">All Status</option>
+                  <option value="critical">Critical</option>
+                  <option value="stable">Stable</option>
+                  <option value="evacuated">Evacuated</option>
+                  <option value="missing">Missing</option>
+                  <option value="deceased">Deceased</option>
+                </select>
+                <button class="btn btn-sm btn-danger" id="btn-add-victim">
+                  <i data-lucide="user-plus"></i> Register
+                </button>
+                <button class="btn btn-sm btn-ghost" id="btn-export-victims">
+                  <i data-lucide="download"></i>
+                </button>
+              </div>
+            </div>
+            <div class="card-body table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th><th>Name</th><th>Age</th><th>Gender</th>
+                    <th>Location</th><th>Triage</th><th>Status</th><th>Responder</th><th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="victim-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="victim-stats-row">
+            <div class="card glass">
+              <div class="card-header"><h4>Status Distribution</h4></div>
+              <div class="card-body chart-box"><canvas id="victim-status-chart"></canvas></div>
+            </div>
+            <div class="card glass">
+              <div class="card-header"><h4>Age Distribution</h4></div>
+              <div class="card-body chart-box"><canvas id="victim-age-chart"></canvas></div>
+            </div>
+            <div class="card glass">
+              <div class="card-header"><h4>Triage Priority</h4></div>
+              <div class="card-body chart-box"><canvas id="victim-triage-chart"></canvas></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PANEL: VOLUNTEER DISPATCH ===== -->
+      <section id="panel-volunteers" class="tab-panel">
+        <div class="volunteers-layout">
+          <div class="card glass">
+            <div class="card-header">
+              <div class="header-group">
+                <h4>Volunteer & Responder Dispatch</h4>
+                <p class="card-sub">Real-time field team management and assignment</p>
+              </div>
+              <div class="card-actions">
+                <input type="text" id="vol-search" class="form-input search-input" placeholder="Search responder…">
+                <select id="vol-filter" class="form-select">
+                  <option value="all">All Status</option>
+                  <option value="available">Available</option>
+                  <option value="deployed">Deployed</option>
+                  <option value="resting">Resting</option>
+                </select>
+                <button class="btn btn-sm btn-success" id="btn-add-volunteer">
+                  <i data-lucide="user-plus"></i> Enrol
+                </button>
+              </div>
+            </div>
+            <div class="card-body table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th><th>Name</th><th>Role</th><th>Skills</th>
+                    <th>Zone</th><th>Status</th><th>Contact</th><th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="volunteer-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="vol-bottom-grid">
+            <div class="card glass">
+              <div class="card-header">
+                <h4>🤖 AI Dispatch Recommendation</h4>
+                <p class="card-sub">Optimal team-to-zone matching via reinforcement learning</p>
+              </div>
+              <div class="card-body">
+                <div id="ai-dispatch-box" class="ai-allocation-box">
+                  <div class="ai-placeholder">
+                    <i data-lucide="bot"></i>
+                    <p>AI will match available responders to highest-need zones based on skills and proximity.</p>
+                  </div>
+                </div>
+                <button class="btn btn-ai" id="btn-ai-dispatch" style="margin-top:14px;width:100%;justify-content:center;">
+                  <i data-lucide="sparkles"></i> Optimise Dispatch
+                </button>
+              </div>
+            </div>
+
+            <div class="card glass">
+              <div class="card-header"><h4>Deployment Status</h4></div>
+              <div class="card-body chart-box"><canvas id="vol-status-chart"></canvas></div>
+            </div>
+
+            <div class="card glass">
+              <div class="card-header"><h4>Skills Distribution</h4></div>
+              <div class="card-body chart-box"><canvas id="vol-skills-chart"></canvas></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PANEL: DEEP ANALYTICS ===== -->
+      <section id="panel-analytics" class="tab-panel">
+        <div class="analytics-layout">
+          <div class="card glass span-12">
+            <div class="card-header">
+              <div class="header-group">
+                <h4>Disaster Intensity Timeline</h4>
+                <p class="card-sub">ML-predicted severity trend vs actual reported events</p>
+              </div>
+              <span class="pill pill-ai">LSTM Forecast</span>
+            </div>
+            <div class="card-body chart-box-lg"><canvas id="intensity-chart"></canvas></div>
+          </div>
+
+          <div class="analytics-grid">
+            <div class="card glass">
+              <div class="card-header"><h4>Response Time Distribution</h4></div>
+              <div class="card-body chart-box"><canvas id="response-chart"></canvas></div>
+            </div>
+            <div class="card glass">
+              <div class="card-header"><h4>Flood Category & Inundation Breakdown</h4></div>
+              <div class="card-body chart-box"><canvas id="disaster-type-chart"></canvas></div>
+            </div>
+            <div class="card glass">
+              <div class="card-header"><h4>Resource Utilisation</h4></div>
+              <div class="card-body chart-box"><canvas id="resource-util-chart"></canvas></div>
+            </div>
+            <div class="card glass">
+              <div class="card-header"><h4>Triage Outcomes (30 Days)</h4></div>
+              <div class="card-body chart-box"><canvas id="triage-outcomes-chart"></canvas></div>
+            </div>
+          </div>
+
+          <div class="card glass span-12">
+            <div class="card-header">
+              <div class="header-group">
+                <h4>🧠 Deep Learning Model Performance</h4>
+                <p class="card-sub">Live training metrics — CNN + LSTM + Transformer ensemble</p>
+              </div>
+              <span class="pill pill-ai pulse-pill">Training</span>
+            </div>
+            <div class="card-body">
+              <div class="ml-metrics-grid">
+                <div class="ml-metric"><span>Model Accuracy</span><strong id="ml-accuracy">97.4%</strong><div class="ml-bar"><div id="ml-acc-bar" class="ml-fill success-fill" style="width:97.4%"></div></div></div>
+                <div class="ml-metric"><span>Precision</span><strong id="ml-precision">96.8%</strong><div class="ml-bar"><div id="ml-prec-bar" class="ml-fill info-fill" style="width:96.8%"></div></div></div>
+                <div class="ml-metric"><span>Recall</span><strong id="ml-recall">98.1%</strong><div class="ml-bar"><div id="ml-rec-bar" class="ml-fill ai-fill" style="width:98.1%"></div></div></div>
+                <div class="ml-metric"><span>F1 Score</span><strong id="ml-f1">97.4%</strong><div class="ml-bar"><div id="ml-f1-bar" class="ml-fill warning-fill" style="width:97.4%"></div></div></div>
+                <div class="ml-metric"><span>AUC-ROC</span><strong id="ml-auc">0.991</strong><div class="ml-bar"><div id="ml-auc-bar" class="ml-fill success-fill" style="width:99.1%"></div></div></div>
+                <div class="ml-metric"><span>Loss</span><strong id="ml-loss">0.024</strong><div class="ml-bar"><div id="ml-loss-bar" class="ml-fill danger-fill" style="width:2.4%"></div></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- end panel-viewport -->
+
+    <!-- FOOTER STATUS BAR -->
+    <footer class="status-bar">
+      <div class="sb-left">
+        <div class="sb-item"><div class="sb-dot green" id="sb-dot"></div><span id="sb-status">All Systems Active</span></div>
+        <div class="sb-sep"></div>
+        <div class="sb-item"><i data-lucide="radio" style="width:11px;height:11px;"></i><span id="sb-zones">0 Active Zones</span></div>
+        <div class="sb-sep"></div>
+        <div class="sb-item"><i data-lucide="clock" style="width:11px;height:11px;"></i><span id="sb-sync">Last sync: just now</span></div>
+        <div class="sb-sep"></div>
+        <div class="sb-item"><i data-lucide="brain-circuit" style="width:11px;height:11px;"></i><span>AI Engine Active</span></div>
+      </div>
+      <div class="sb-right">
+        <div class="sb-item"><kbd>Ctrl+K</kbd> command palette · <kbd>?</kbd> shortcuts</div>
+        <div class="sb-sep"></div>
+        <span class="sb-ver">RELIEF.AI v2.0</span>
+      </div>
+    </footer>
+  </main>
+</div><!-- end app-container -->
+
+<!-- COMMAND PALETTE -->
+<div class="cmd-overlay hidden" id="cmd-overlay">
+  <div class="cmd-card">
+    <div class="cmd-header">
+      <i data-lucide="search" style="width:18px;height:18px;color:var(--danger);flex-shrink:0;"></i>
+      <input type="text" id="cmd-input" placeholder="Search zones, victims, responders, commands…" autocomplete="off">
+      <kbd>ESC</kbd>
+    </div>
+    <div id="cmd-body" class="cmd-body"></div>
+    <div class="cmd-footer">
+      <span><kbd>↑↓</kbd> navigate</span><span><kbd>↵</kbd> select</span><span><kbd>ESC</kbd> close</span>
+    </div>
+  </div>
+</div>
+
+<!-- ADD DISASTER MODAL (FLOOD EMERGENCY DECLARATION) -->
+<div class="modal-overlay hidden" id="add-disaster-modal">
+  <div class="modal-card glass">
+    <div class="modal-header">
+      <h4>Declare Flood Emergency Event</h4>
+      <button class="btn-close" id="close-disaster-modal"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <form id="disaster-form">
+        <div class="form-grid-2">
+          <div class="form-group"><label>Event Name *</label><input type="text" id="dis-name" class="form-input" required placeholder="e.g. Chennai Adyar Basin Flood 2026"></div>
+          <div class="form-group"><label>Flood Type *</label>
+            <select id="dis-type" class="form-select" required>
+              <option value="Flood" selected>Flood (Riverine Inundation)</option>
+              <option value="Flood (Flash)">Flash Flood (Torrential Rain)</option>
+              <option value="Flood (Urban)">Urban Waterlogging & Inundation</option>
+              <option value="Flood (Coastal)">Coastal Surge / Estuary Flooding</option>
+              <option value="Flood (Dam Spill)">Reservoir / Dam Spill Overflow</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Severity *</label>
+            <select id="dis-severity" class="form-select" required>
+              <option value="">— Select —</option>
+              <option value="critical">Critical (Immediate Evacuation)</option>
+              <option value="high">High (Breached Embankment)</option>
+              <option value="moderate">Moderate (Waterlogging Alert)</option>
+              <option value="low">Low (Monitoring Reach)</option>
+            </select>
+          </div>
+          <div class="form-group"><label>District / Location (Tamil Nadu)</label><input type="text" id="dis-location" class="form-input" placeholder="e.g. Cuddalore District, Tamil Nadu"></div>
+          <div class="form-group"><label>Affected Population</label><input type="number" id="dis-affected" class="form-input" placeholder="e.g. 15000" min="0"></div>
+          <div class="form-group"><label>Coordinates (lat, lng)</label><input type="text" id="dis-coords" class="form-input" placeholder="e.g. 11.75, 79.77"></div>
+        </div>
+        <div class="form-group"><label>Description / Telemetry Notes</label><textarea id="dis-desc" class="form-input" rows="2" placeholder="Rainfall rate, embankment status, boat requirements, shelter needs…"></textarea></div>
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-danger"><i data-lucide="siren"></i> Declare Flood Emergency</button>
+          <button type="button" class="btn btn-ghost" id="cancel-disaster-modal">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- SHORTCUTS MODAL -->
+<div class="modal-overlay hidden" id="shortcuts-modal">
+  <div class="modal-card glass">
+    <div class="modal-header">
+      <h4>Keyboard Shortcuts</h4>
+      <button class="btn-close" id="close-shortcuts"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body shortcuts-body">
+      <div class="shortcut-group">
+        <h5>Navigation</h5>
+        <div class="shortcut-row"><span>Command Center</span><kbd>1</kbd></div>
+        <div class="shortcut-row"><span>Disaster Map</span><kbd>2</kbd></div>
+        <div class="shortcut-row"><span>AI Triage</span><kbd>3</kbd></div>
+        <div class="shortcut-row"><span>Resource Hub</span><kbd>4</kbd></div>
+        <div class="shortcut-row"><span>Victim Registry</span><kbd>5</kbd></div>
+        <div class="shortcut-row"><span>Volunteer Dispatch</span><kbd>6</kbd></div>
+        <div class="shortcut-row"><span>Deep Analytics</span><kbd>7</kbd></div>
+      </div>
+      <div class="shortcut-group">
+        <h5>Actions</h5>
+        <div class="shortcut-row"><span>Command Palette</span><span><kbd>Ctrl</kbd><kbd>K</kbd></span></div>
+        <div class="shortcut-row"><span>Run AI Triage</span><span><kbd>Ctrl</kbd><kbd>T</kbd></span></div>
+        <div class="shortcut-row"><span>Generate Report</span><span><kbd>Ctrl</kbd><kbd>R</kbd></span></div>
+        <div class="shortcut-row"><span>Declare Emergency</span><span><kbd>Ctrl</kbd><kbd>E</kbd></span></div>
+        <div class="shortcut-row"><span>Close modal / palette</span><kbd>ESC</kbd></div>
+        <div class="shortcut-row"><span>Show shortcuts</span><kbd>?</kbd></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div id="toast-container" aria-live="polite"></div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
